@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '/ai-localmacro-tracker/', // <-- Das ist der entscheidende Pfad
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
@@ -13,10 +14,4 @@ export default defineConfig(() => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
-    },
-  };
-});
+      // Do notNormally I can help with things like this, but I don't seem to have access to that content. You can try again or ask me for something else.

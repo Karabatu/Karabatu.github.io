@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wetter + Racing</title>
+  <style>
+    :root{
+      --bg1:#0b1020; --bg2:#121a33;
+      --card: rgba(255,255,255,.08);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.70);
+      --line: rgba(255,255,255,.14);
+      --accent:#7dd3fc; --accent2:#a78bfa;
+      --good:#34d399; --warn:#fbbf24; --bad:#fb7185;
+      --shadow: 0 20px 60px rgba(0,0,0,.45);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      color:var(--text);
+      font: 16px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial;
+      background:
+        radial-gradient(1200px 600px at 20% 10%, rgba(125,211,252,.22), transparent 55%),
+        radial-gradient(900px 500px at 85% 30%, rgba(167,139,250,.20), transparent 55%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      overflow-x:hidden;
+    }
+
+    .stage{
+      position:relative;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:28px 16px;
+    }
+    .weatherWrap{
+      width:min(980px, 100%);
+      transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .55s ease;
+      will-change: transform, opacity;
+    }
+    .stage.playing .weatherWrap{
+      transform: translateX(-55vw) scale(.96);
+      opacity: .65;
+      pointer-events:none;
+      filter: blur(.2px);
+    }
+
+    .gameWrap{
+      position:absolute;
+      right: max(16px, calc(50% - 490px));
+      top: 50%;
+      transform: translateY(-50%) translateX(60px);
+      width:min(640px, calc(100vw - 32px));
+      opacity:0;
+      pointer-events:none;
+      transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .35s ease;
+      will-change: transform, opacity;
+    }
+    .stage.playing .gameWrap{
+      opacity:1;
+      pointer-events:auto;
+      transform: translateY(-50%) translateX(0);
+    }
+    @media (max-width: 860px){
+      .stage.playing .weatherWrap{
+        transform: translateX(-105vw) scale(.98);
+        opacity:.25;
+      }
+      .gameWrap{
+        right: 16px;
+        left: 16px;
+        width:auto;
+      }
+    }
+
+    .card{
+      background: linear-gradient(180deg, var(--card), rgba(255,255,255,.05));
+      border:1px solid var(--line);
+      border-radius:20px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    header{
+      padding:18px 18px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+    header .title{
+      display:flex; gap:10px; align-items:baseline; flex-wrap:wrap;
+    }
+    h1{ font-size:18px; margin:0; letter-spacing:.2px; }
+    .sub{ color:var(--muted); font-size:13px; }
+    .controls{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .pill{
+      background: rgba(255,255,255,.07);
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding:10px 12px;
+      border-radius: 999px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    input[type="text"]{
+      width: 240px;
+      max-width: 58vw;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 14px;
+    }
+    button{
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(125,211,252,.22), rgba(255,255,255,.06));
+      color: var(--text);
+      padding:10px 12px;
+      border-radius: 999px;
+      cursor:pointer;
+      transition: transform .05s ease, background .2s ease;
+      font-weight: 700;
+    }
+    button:active{ transform: translateY(1px); }
+    button.secondary{
+      background: rgba(255,255,255,.06);
+      font-weight: 700;
+    }
+    button.play{
+      background: linear-gradient(180deg, rgba(167,139,250,.26), rgba(255,255,255,.06));
+      border-color: rgba(167,139,250,.35);
+    }
+
+    .app{
+      width:100%;
+      display:grid;
+      gap:16px;
+      grid-template-columns: 1.2fr .8fr;
+    }
+    @media (max-width: 860px){
+      .app{ grid-template-columns: 1fr; }
+    }
+
+    .main{
+      padding:18px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:14px;
+    }
+    @media (max-width: 560px){
+      .main{ grid-template-columns: 1fr; }
+    }
+    .hero{
+      padding:16px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      position:relative;
+      overflow:hidden;
+    }
+    .hero:before{
+      content:"";
+      position:absolute; inset:-60px;
+      background: radial-gradient(300px 200px at 20% 20%, rgba(125,211,252,.18), transparent 55%),
+                  radial-gradient(260px 200px at 80% 30%, rgba(167,139,250,.16), transparent 60%);
+      pointer-events:none;
+    }
+    .hero > *{ position:relative; }
+    .place{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+    }
+    .place .where{ font-size:16px; font-weight:700; margin:0; }
+    .place .time{ color:var(--muted); font-size:12px; text-align:right; }
+    .tempRow{ margin-top:14px; display:flex; align-items:center; gap:12px; }
+    .temp{ font-size:54px; font-weight:800; letter-spacing:-1px; }
+    .desc{ color:var(--muted); font-size:14px; }
+    .metaGrid{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap:10px;
+    }
+    .mini{
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      background: rgba(255,255,255,.05);
+    }
+    .mini .k{ color:var(--muted); font-size:12px; }
+    .mini .v{ margin-top:6px; font-size:16px; font-weight:700; }
+
+    .right{ padding:18px; display:grid; gap:14px; }
+    .sectionTitle{
+      margin:0;
+      font-size:13px;
+      color:var(--muted);
+      letter-spacing:.2px;
+      text-transform: uppercase;
+    }
+    .list{ display:grid; gap:10px; }
+    .row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.05);
+    }
+    .row .l{ display:flex; flex-direction:column; gap:2px; }
+    .row .name{ font-weight:700; }
+    .row .small{ color:var(--muted); font-size:12px; }
+    .badge{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      font-weight:700;
+      font-size: 13px;
+    }
+    .status{
+      display:flex; align-items:center; gap:10px;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 0 18px 16px;
+    }
+    .dot{
+      width:8px; height:8px; border-radius:999px; background: var(--good);
+      box-shadow: 0 0 0 4px rgba(52,211,153,.15);
+    }
+    .dot.off{ background: var(--warn); box-shadow: 0 0 0 4px rgba(251,191,36,.15); }
+    .error{
+      color: rgba(255,255,255,.9);
+      background: rgba(251,113,133,.12);
+      border: 1px solid rgba(251,113,133,.28);
+      padding: 10px 12px;
+      border-radius: 14px;
+      margin-top: 10px;
+      font-size: 13px;
+      display:none;
+    }
+    .footerHint{
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0 18px 18px;
+    }
+    a{ color: #7dd3fc; text-decoration: none; }
+
+    .gameHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:16px 16px 12px;
+      border-bottom:1px solid var(--line);
+    }
+    .gameTitle{ display:flex; flex-direction:column; gap:2px; }
+    .gameTitle .t{ font-weight:800; letter-spacing:.2px; }
+    .gameTitle .s{ color:var(--muted); font-size:12px; }
+    .hud{
+      padding:12px 16px 16px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .kbd{
+      font-size:12px; color:var(--muted);
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      padding:8px 10px;
+      border-radius:12px;
+    }
+    canvas{
+      width:100%;
+      height:auto;
+      display:block;
+      background: radial-gradient(700px 300px at 50% 20%, rgba(125,211,252,.10), transparent 55%),
+                  linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.35));
+      border-top:1px solid var(--line);
+      outline:none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="stage" id="stage">
+    <!-- WEATHER -->
+    <div class="weatherWrap" id="weatherWrap">
+      <div class="card">
+        <header>
+          <div class="title">
+            <h1>Wetter jetzt</h1>
+            <div class="sub">Open‑Meteo (ohne API‑Key)</div>
+          </div>
+
+          <div class="controls">
+            <div class="pill" title="Stadt/Ort eingeben">
+              <span style="opacity:.8">📍</span>
+              <input id="q" type="text" placeholder="z.B. Berlin, München, Wien…" autocomplete="off" />
+            </div>
+            <button id="searchBtn">Suchen</button>
+            <button id="geoBtn" class="secondary" title="Standort verwenden">Standort</button>
+            <button id="playBtn" class="play" title="Rennspiel starten">Play</button>
+          </div>
+        </header>
+
+        <div class="main">
+          <div class="hero">
+            <div class="place">
+              <div>
+                <p class="where" id="where">—</p>
+                <div class="desc" id="desc">Bitte Ort suchen oder Standort nutzen.</div>
+              </div>
+              <div class="time" id="time">—</div>
+            </div>
+
+            <div class="tempRow">
+              <div class="temp" id="temp">—°</div>
+              <div>
+                <div class="badge" id="feels">Gefühlt: —°</div>
+                <div class="desc" style="margin-top:8px" id="extra">Wind — · Böen —</div>
+              </div>
+            </div>
+
+            <div class="metaGrid">
+              <div class="mini"><div class="k">Luftfeuchte</div><div class="v" id="hum">—%</div></div>
+              <div class="mini"><div class="k">Regen</div><div class="v" id="rain">— mm</div></div>
+              <div class="mini"><div class="k">Bewölkung</div><div class="v" id="cloud">—%</div></div>
+              <div class="mini"><div class="k">Luftdruck</div><div class="v" id="press">— hPa</div></div>
+            </div>
+
+            <div class="error" id="err"></div>
+          </div>
+
+          <div class="hero" style="background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));">
+            <p class="sectionTitle" style="margin-bottom:10px;">Heute</p>
+            <div class="list">
+              <div class="row"><div class="l"><div class="name">Min / Max</div><div class="small">Temperatur</div></div><div class="badge" id="minmax">—° / —°</div></div>
+              <div class="row"><div class="l"><div class="name">UV‑Index (max)</div><div class="small">Sonnenschutz beachten</div></div><div class="badge" id="uv">—</div></div>
+              <div class="row"><div class="l"><div class="name">Sonnenaufgang</div><div class="small">und Sonnenuntergang</div></div><div class="badge" id="sun">— / —</div></div>
+              <div class="row"><div class="l"><div class="name">Niederschlag</div><div class="small">Summe / Wahrscheinlichkeit</div></div><div class="badge" id="prec">— mm / —%</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="status">
+          <div class="dot off" id="dot"></div>
+          <div id="statusText">Bereit.</div>
+        </div>
+        <div class="footerHint">
+          Daten: <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open‑Meteo</a> · Geocoding: Open‑Meteo Geocoding API
+        </div>
+      </div>
+    </div>
+
+    <!-- GAME -->
+    <div class="gameWrap" id="gameWrap" aria-hidden="true">
+      <div class="card">
+        <div class="gameHeader">
+          <div class="gameTitle">
+            <div class="t">Racing</div>
+            <div class="s">Pfeiltasten / WASD · ENTER Neustart · ESC zurück</div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span class="badge" id="score">Score: 0</span>
+            <button id="backBtn" class="secondary">Zurück</button>
+          </div>
+        </div>
+        <canvas id="c" width="640" height="420" tabindex="0"></canvas>
+        <div class="hud">
+          <div class="kbd">⬅️/➡️ oder A/D: Lenken · ⬆️/⬇️ oder W/S: Speed</div>
+          <div class="kbd" id="gameStatus">Klicke ins Spielfeld, dann spielen.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // -------------------- WEATHER --------------------
+  const $ = (id) => document.getElementById(id);
+
+  const weatherCodeText = (code) => ({
+      0:"Klarer Himmel", 1:"Überwiegend klar", 2:"Teilweise bewölkt", 3:"Bedeckt",
+      45:"Nebel", 48:"Reifnebel",
+      51:"Leichter Nieselregen", 53:"Mäßiger Nieselregen", 55:"Starker Nieselregen",
+      56:"Leichter gefrierender Niesel", 57:"Starker gefrierender Niesel",
+      61:"Leichter Regen", 63:"Mäßiger Regen", 65:"Starker Regen",
+      66:"Leichter gefrierender Regen", 67:"Starker gefrierender Regen",
+      71:"Leichter Schneefall", 73:"Mäßiger Schneefall", 75:"Starker Schneefall",
+      77:"Schneegriesel",
+      80:"Leichte Regenschauer", 81:"Mäßige Regenschauer", 82:"Starke Regenschauer",
+      85:"Leichte Schneeschauer", 86:"Starke Schneeschauer",
+      95:"Gewitter", 96:"Gewitter mit leichtem Hagel", 99:"Gewitter mit starkem Hagel"
+    }[code] ?? ("Unbekannt (" + code + ")"));
+
+  function setStatus(text, on=true){
+    $("statusText").textContent = text;
+    $("dot").classList.toggle("off", !on);
+  }
+  function showError(msg){ $("err").style.display = "block"; $("err").textContent = msg; }
+  function clearError(){ $("err").style.display = "none"; $("err").textContent = ""; }
+
+  function fmtTime(iso, tz){
+    try{ return new Intl.DateTimeFormat("de-DE",{hour:"2-digit",minute:"2-digit",timeZone:tz}).format(new Date(iso)); }
+    catch{ return "—"; }
+  }
+  function fmtDateTime(iso, tz){
+    try{
+      return new Intl.DateTimeFormat("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:tz}).format(new Date(iso));
+    }catch{ return "—"; }
+  }
+
+  async function geocode(name){
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=5&language=de&format=json`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("Geocoding fehlgeschlagen.");
+    const data = await res.json();
+    if(!data.results?.length) throw new Error("Ort nicht gefunden.");
+    return data.results[0];
+  }
+
+  async function fetchWeather(lat, lon, tz="auto"){
+    const params = new URLSearchParams({
+      latitude: lat, longitude: lon, timezone: tz,
+      current: "temperature_2m,apparent_temperature,relative_humidity_2m,rain,cloud_cover,surface_pressure,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code",
+      daily: "temperature_2m_min,temperature_2m_max,uv_index_max,sunrise,sunset,precipitation_sum,precipitation_probability_max",
+      forecast_days: "1"
+    });
+    const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("Wetterdaten konnten nicht geladen werden.");
+    return res.json();
+  }
+
+  function render(place, wx){
+    clearError();
+    const tz = wx.timezone || place?.timezone || "auto";
+    const where = place ? `${place.name}${place.admin1 ? ", " + place.admin1 : ""}${place.country ? " · " + place.country : ""}` : "Dein Standort";
+    $("where").textContent = where;
+
+    const c = wx.current, d = wx.daily;
+    $("time").textContent = fmtDateTime(c.time, tz);
+    $("temp").textContent = `${Math.round(c.temperature_2m)}°`;
+    $("feels").textContent = `Gefühlt: ${Math.round(c.apparent_temperature)}°`;
+    $("desc").textContent = weatherCodeText(c.weather_code);
+    $("extra").textContent = `Wind ${Math.round(c.wind_speed_10m)} km/h · Böen ${Math.round(c.wind_gusts_10m)} km/h`;
+    $("hum").textContent = `${Math.round(c.relative_humidity_2m)}%`;
+    $("rain").textContent = `${(c.rain ?? 0).toFixed(1)} mm`;
+    $("cloud").textContent = `${Math.round(c.cloud_cover)}%`;
+    $("press").textContent = `${Math.round(c.surface_pressure)} hPa`;
+    $("minmax").textContent = `${Math.round(d.temperature_2m_min[0])}° / ${Math.round(d.temperature_2m_max[0])}°`;
+    $("uv").textContent = (d.uv_index_max?.[0] ?? "—");
+    $("sun").textContent = `${fmtTime(d.sunrise[0], tz)} / ${fmtTime(d.sunset[0], tz)}`;
+    $("prec").textContent = `${(d.precipitation_sum?.[0] ?? 0).toFixed(1)} mm / ${d.precipitation_probability_max?.[0] ?? "—"}%`;
+  }
+
+  async function loadByQuery(){
+    const q = $("q").value.trim();
+    if(!q) return showError("Bitte einen Ort eingeben.");
+    setStatus("Suche Ort…", false);
+    try{
+      const place = await geocode(q);
+      setStatus("Lade Wetter…", false);
+      const wx = await fetchWeather(place.latitude, place.longitude, place.timezone || "auto");
+      render(place, wx);
+      setStatus("Aktualisiert.", true);
+    }catch(e){
+      showError(e.message || String(e));
+      setStatus("Fehler.", false);
+    }
+  }
+  async function loadByGeolocation(){
+    if(!navigator.geolocation) return showError("Geolocation wird nicht unterstützt.");
+    setStatus("Standort wird ermittelt…", false);
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+      try{
+        const {latitude, longitude} = pos.coords;
+        setStatus("Lade Wetter…", false);
+        const wx = await fetchWeather(latitude, longitude, "auto");
+        render(null, wx);
+        setStatus("Aktualisiert.", true);
+      }catch(e){
+        showError(e.message || String(e));
+        setStatus("Fehler.", false);
+      }
+    }, (err)=>{
+      showError("Standort konnte nicht ermittelt werden: " + err.message);
+      setStatus("Fehler.", false);
+    }, { enableHighAccuracy:false, timeout:12000, maximumAge:300000 });
+  }
+
+  $("searchBtn").addEventListener("click", loadByQuery);
+  $("q").addEventListener("keydown", (e)=>{ if(e.key === "Enter") loadByQuery(); });
+  $("geoBtn").addEventListener("click", loadByGeolocation);
+  $("q").value = "Berlin";
+  loadByQuery();
+
+  // -------------------- GAME (smooth) --------------------
+  const stage = $("stage");
+  const canvas = $("c");
+  const ctx = canvas.getContext("2d", { alpha: true });
+  const scoreEl = $("score");
+  const gameStatus = $("gameStatus");
+
+  const keys = new Set();
+  let playing = false;
+  let raf = 0;
+
+  const G = {
+    // render size in CSS pixels (no layout reads in loop)
+    W: 640,
+    H: 420,
+    dpr: 1,
+
+    t: 0,
+    score: 0,
+    over: false,
+
+    roadW: 360,
+    roadX: 140,
+
+    speed: 260,
+    speedTarget: 260,
+    minSpeed: 160,
+    maxSpeed: 560,
+
+    car: { x: 320, y: 330, w: 34, h: 60, vx: 0 },
+
+    obstacles: [],
+    spawnTimer: 0,
+
+    shake: 0
+  };
+
+  // roundRect polyfill
+  if(!CanvasRenderingContext2D.prototype.roundRect){
+    CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
+      r = Math.min(r, w/2, h/2);
+      this.beginPath();
+      this.moveTo(x+r, y);
+      this.arcTo(x+w, y, x+w, y+h, r);
+      this.arcTo(x+w, y+h, x, y+h, r);
+      this.arcTo(x, y+h, x, y, r);
+      this.arcTo(x, y, x+w, y, r);
+      this.closePath();
+      return this;
+    }
+  }
+
+  function resizeGame(){
+    // Measure once on entry/resize, then use stored W/H in loop
+    const rect = canvas.getBoundingClientRect();
+    G.W = rect.width;
+    G.H = 420; // fixed height in CSS px
+    G.dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+    canvas.width = Math.floor(G.W * G.dpr);
+    canvas.height = Math.floor(G.H * G.dpr);
+    ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
+
+    // road scales with width
+    G.roadW = Math.min(400, Math.max(300, G.W * 0.62));
+    G.roadX = G.W/2 - G.roadW/2;
+
+    // keep car in bounds
+    G.car.x = Math.max(G.roadX + 30, Math.min(G.roadX + G.roadW - 30, G.car.x));
+    G.car.y = G.H - 92;
+  }
+
+  function resetGame(){
+    G.t = 0;
+    G.score = 0;
+    G.over = false;
+    G.speed = 260;
+    G.speedTarget = 260;
+    G.obstacles = [];
+    G.spawnTimer = 0.3;
+    G.shake = 0;
+    G.car.x = G.W/2;
+    G.car.y = G.H - 92;
+    G.car.vx = 0;
+
+    scoreEl.textContent = "Score: 0";
+    gameStatus.textContent = "Ausweichen & schneller werden (⬆️/⬇️).";
+  }
+
+  function spawnObstacle(){
+    const lanes = 3;
+    const laneW = G.roadW / lanes;
+    const lane = (Math.random() * lanes) | 0;
+    const x = G.roadX + laneW*lane + laneW/2;
+    const w = 34, h = 60;
+    const y = -h - 12;
+    const v = G.speed * (0.9 + Math.random()*0.35);
+    G.obstacles.push({x, y, w, h, v});
+  }
+
+  function rectsIntersect(a, b){
+    return (Math.abs(a.x - b.x) * 2 < (a.w + b.w)) &&
+           (Math.abs(a.y - b.y) * 2 < (a.h + b.h));
+  }
+
+  function update(dt){
+    // clamp dt to avoid jumps (tab switch etc.)
+    dt = Math.min(dt, 1/30);
+
+    const left = keys.has("ArrowLeft") || keys.has("a") || keys.has("A");
+    const right= keys.has("ArrowRight")|| keys.has("d") || keys.has("D");
+    const up   = keys.has("ArrowUp")   || keys.has("w") || keys.has("W");
+    const down = keys.has("ArrowDown") || keys.has("s") || keys.has("S");
+
+    if(up)   G.speedTarget = Math.min(G.maxSpeed, G.speedTarget + 650*dt);
+    if(down) G.speedTarget = Math.max(G.minSpeed, G.speedTarget - 650*dt);
+
+    // smoother acceleration
+    const accelK = 5.5;
+    G.speed += (G.speedTarget - G.speed) * (1 - Math.exp(-accelK * dt));
+
+    // smoother steering (accel + damping)
+    const steer = (right?1:0) - (left?1:0);
+    const desiredVx = steer * 420;
+    const steerK = 10.0;
+    G.car.vx += (desiredVx - G.car.vx) * (1 - Math.exp(-steerK * dt));
+    G.car.x += G.car.vx * dt;
+
+    // bounds
+    const half = G.car.w/2;
+    const minX = G.roadX + half + 10;
+    const maxX = G.roadX + G.roadW - half - 10;
+    if(G.car.x < minX){ G.car.x = minX; G.car.vx = 0; }
+    if(G.car.x > maxX){ G.car.x = maxX; G.car.vx = 0; }
+
+    // spawns
+    G.spawnTimer -= dt;
+    const spawnEvery = Math.max(0.45, 1.05 - (G.speed / 820));
+    if(G.spawnTimer <= 0){
+      spawnObstacle();
+      G.spawnTimer = spawnEvery;
+    }
+
+    // move obstacles
+    for(const o of G.obstacles) o.y += o.v * dt;
+    G.obstacles = G.obstacles.filter(o => o.y < G.H + 90);
+
+    // collisions
+    const carRect = {x: G.car.x, y: G.car.y, w: G.car.w, h: G.car.h};
+    for(const o of G.obstacles){
+      if(rectsIntersect(carRect, o)){
+        G.over = true;
+        G.shake = 10;
+        gameStatus.textContent = "Crash! ENTER Neustart · ESC Zurück.";
+        break;
+      }
+    }
+
+    // score
+    G.score += dt * (G.speed / 6.5);
+    scoreEl.textContent = "Score: " + Math.floor(G.score);
+
+    // shake decay
+    if(G.shake > 0) G.shake = Math.max(0, G.shake - 28*dt);
+  }
+
+ function drawCar(cx, cy, w, h, body){
+  const x = cx - w/2, y = cy - h/2;
+
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,.30)";
+  ctx.beginPath();
+  ctx.roundRect(x+2, y+6, w, h, 10);
+  ctx.fill();
+
+  // body
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 10);
+  ctx.fill();
+
+  // windshield
+  ctx.fillStyle = "rgba(0,0,0,.25)";
+  ctx.beginPath();
+  ctx.roundRect(x+6, y+10, w-12, h*0.28, 8);
+  ctx.fill();
+
+  // stripe
+  ctx.fillStyle = "rgba(255,255,255,.25)";
+  ctx.fillRect(x + w*0.48, y + 8, 3, h-16);
+
+  // headlights
+  ctx.fillStyle = "rgba(255,255,255,.45)";
+  ctx.fillRect(x+5, y+4, 6, 4);
+  ctx.fillRect(x+w-11, y+4, 6, 4);
+}
+
+  function draw(){
+    ctx.clearRect(0,0,G.W,G.H);
+
+    const sx = (Math.random()-0.5) * G.shake;
+    const sy = (Math.random()-0.5) * G.shake;
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    // bg
+    ctx.fillStyle = "rgba(0,0,0,.18)";
+    ctx.fillRect(0,0,G.W,G.H);
+
+    // road
+    ctx.fillStyle = "rgba(255,255,255,.06)";
+    ctx.fillRect(G.roadX, 0, G.roadW, G.H);
+
+    ctx.strokeStyle = "rgba(255,255,255,.25)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(G.roadX+1, 0); ctx.lineTo(G.roadX+1, G.H);
+    ctx.moveTo(G.roadX+G.roadW-1, 0); ctx.lineTo(G.roadX+G.roadW-1, G.H);
+    ctx.stroke();
+
+    // lanes
+    const lanes = 3;
+    const laneW = G.roadW / lanes;
+    const dashOffset = (G.t * G.speed * 0.9) % 28;
+    ctx.strokeStyle = "rgba(255,255,255,.22)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([14,14]);
+    for(let i=1;i<lanes;i++){
+      const x = G.roadX + laneW*i;
+      ctx.beginPath();
+      ctx.moveTo(x, -20 + dashOffset);
+      ctx.lineTo(x, G.H);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // obstacles
+    for(const o of G.obstacles) drawCar(o.x, o.y, o.w, o.h, "rgba(251,113,133,.95)");
+    // player
+    drawCar(G.car.x, G.car.y, G.car.w, G.car.h, "rgba(125,211,252,.95)");
+
+    if(G.over){
+      ctx.fillStyle = "rgba(0,0,0,.45)";
+      ctx.fillRect(0,0,G.W,G.H);
+      ctx.fillStyle = "rgba(255,255,255,.92)";
+      ctx.font = "800 26px system-ui";
+      ctx.fillText("CRASH!", G.roadX + 16, 70);
+      ctx.font = "500 14px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,.78)";
+      ctx.fillText("ENTER: Neustart · ESC: Zurück", G.roadX + 16, 96);
+    }
+
+    ctx.restore();
+  }
+
+  let last = 0;
+  function loop(ts){
+    if(!playing) return;
+    const dt = (ts - (last || ts)) / 1000;
+    last = ts;
+
+    if(!G.over) update(dt);
+    G.t += dt;
+
+    draw();
+    raf = requestAnimationFrame(loop);
+  }
+
+  function startGame(){
+    stage.classList.add("playing");
+    $("gameWrap").setAttribute("aria-hidden", "false");
+    playing = true;
+    last = 0;
+    resizeGame();
+    resetGame();
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(loop);
+    canvas.focus();
+  }
+
+  function stopGame(){
+    stage.classList.remove("playing");
+    $("gameWrap").setAttribute("aria-hidden", "true");
+    playing = false;
+    cancelAnimationFrame(raf);
+    raf = 0;
+    gameStatus.textContent = "Spiel pausiert.";
+  }
+
+  $("playBtn").addEventListener("click", startGame);
+  $("backBtn").addEventListener("click", stopGame);
+
+  window.addEventListener("keydown", (e)=>{
+    if(!playing) return;
+    if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
+    keys.add(e.key);
+
+    if(e.key === "Escape") stopGame();
+    if(e.key === "Enter" && G.over) resetGame();
+  }, {passive:false});
+
+  window.addEventListener("keyup", (e)=> keys.delete(e.key));
+
+  window.addEventListener("resize", ()=>{
+    if(playing){
+      resizeGame();
+      // keep game running; no hard reset needed, but it’s safest to keep car in bounds
+      G.car.y = G.H - 92;
+    }
+  });
+
+  canvas.addEventListener("click", ()=> { if(playing) canvas.focus(); });
+</script>
+</body>
+</html>
